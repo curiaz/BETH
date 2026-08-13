@@ -7,28 +7,30 @@ and sells when RSI indicates overbought conditions.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
-from app.engine.strategy.base import (
-    BaseStrategy,
-    HOLD_SIGNAL,
-    ParameterSpec,
-    ParameterType,
-    PortfolioState,
-    Signal,
-    SignalDirection,
+from app.domain.enums import Signal
+from app.engine.strategy.base import ParameterSpec, ParameterType
+from app.engine.strategy.framework import (
+    SignalResult,
+    Strategy,
+    StrategyConfiguration,
+    StrategyContext,
 )
 from app.engine.strategy.registry import StrategyRegistry
 
 
 @StrategyRegistry.register
-class RSIMeanReversion(BaseStrategy):
+class RSIMeanReversion(Strategy):
     """
     RSI Mean Reversion strategy.
 
     BUY when RSI drops below oversold threshold (default 30).
     SELL when RSI rises above overbought threshold (default 70).
+    HOLD when RSI is in neutral range.
     """
 
     name = "rsi_mean_reversion"
@@ -40,10 +42,20 @@ class RSIMeanReversion(BaseStrategy):
         rsi_period: int = 14,
         oversold: float = 30.0,
         overbought: float = 70.0,
+        config: StrategyConfiguration | dict[str, Any] | None = None,
+        **kwargs: Any,
     ):
-        self.rsi_period = rsi_period
-        self.oversold = oversold
-        self.overbought = overbought
+        params = {"rsi_period": rsi_period, "oversold": oversold, "overbought": overbought}
+        if kwargs:
+            params.update(kwargs)
+        if isinstance(config, dict):
+            params.update(config)
+
+        super().__init__(config=params)
+
+        self.rsi_period = int(self.configuration.parameters.get("rsi_period", rsi_period))
+        self.oversold = float(self.configuration.parameters.get("oversold", oversold))
+        self.overbought = float(self.configuration.parameters.get("overbought", overbought))
         self._prev_rsi: float | None = None
 
     @classmethod
@@ -77,7 +89,7 @@ class RSIMeanReversion(BaseStrategy):
 
     @staticmethod
     def _compute_rsi(close: pd.Series, period: int) -> pd.Series:
-        """Compute RSI manually (no pandas-ta dependency in engine)."""
+        """Compute RSI manually."""
         delta = close.diff()
         gain = delta.where(delta > 0, 0.0)
         loss = (-delta).where(delta < 0, 0.0)
@@ -85,7 +97,6 @@ class RSIMeanReversion(BaseStrategy):
         avg_gain = gain.rolling(window=period, min_periods=period).mean()
         avg_loss = loss.rolling(window=period, min_periods=period).mean()
 
-        # Use Wilder's smoothing after initial SMA
         for i in range(period, len(close)):
             avg_gain.iloc[i] = (avg_gain.iloc[i - 1] * (period - 1) + gain.iloc[i]) / period
             avg_loss.iloc[i] = (avg_loss.iloc[i - 1] * (period - 1) + loss.iloc[i]) / period
@@ -100,44 +111,61 @@ class RSIMeanReversion(BaseStrategy):
         df["rsi"] = self._compute_rsi(df["close"].astype(float), self.rsi_period)
         return df
 
-    def on_bar(self, bar: pd.Series, portfolio_state: PortfolioState) -> Signal:
-        """Generate signal based on RSI levels."""
-        rsi = bar.get("rsi")
+    def generate_signal(self, context: StrategyContext) -> SignalResult:
+        """Generate signal based on RSI threshold levels."""
+        symbol = context.symbol
+        rsi = context.indicators.get("rsi")
+
+        if rsi is None and isinstance(context.candle, pd.Series):
+            rsi = context.candle.get("rsi")
 
         if rsi is None or pd.isna(rsi):
-            return HOLD_SIGNAL
+            return SignalResult(
+                symbol=symbol,
+                direction=Signal.HOLD,
+                strength=0.0,
+                confidence=0.0,
+                timestamp=context.timestamp,
+                metadata={"reason": "Insufficient RSI data"},
+            )
 
         rsi_val = float(rsi)
-        signal = HOLD_SIGNAL
+        direction = Signal.HOLD
+        strength = 0.0
+        confidence = 0.5
+        trigger = "neutral"
 
-        # Oversold → BUY (mean reversion expects price to bounce up)
+        # Oversold → BUY
         if rsi_val <= self.oversold:
-            # Stronger signal the more oversold
-            strength = min(1.0, (self.oversold - rsi_val) / self.oversold)
-            signal = Signal(
-                direction=SignalDirection.BUY,
-                strength=round(0.5 + strength * 0.5, 2),
-                confidence=round(0.6 + strength * 0.3, 2),
-                metadata={"trigger": "oversold", "rsi": rsi_val},
-            )
+            s_ratio = min(1.0, (self.oversold - rsi_val) / self.oversold)
+            direction = Signal.BUY
+            strength = round(0.5 + s_ratio * 0.5, 2)
+            confidence = round(0.6 + s_ratio * 0.3, 2)
+            trigger = "oversold"
 
-        # Overbought → SELL (mean reversion expects price to drop)
+        # Overbought → SELL
         elif rsi_val >= self.overbought:
-            strength = min(1.0, (rsi_val - self.overbought) / (100.0 - self.overbought))
-            signal = Signal(
-                direction=SignalDirection.SELL,
-                strength=round(0.5 + strength * 0.5, 2),
-                confidence=round(0.6 + strength * 0.3, 2),
-                metadata={"trigger": "overbought", "rsi": rsi_val},
-            )
+            s_ratio = min(1.0, (rsi_val - self.overbought) / (100.0 - self.overbought))
+            direction = Signal.SELL
+            strength = round(0.5 + s_ratio * 0.5, 2)
+            confidence = round(0.6 + s_ratio * 0.3, 2)
+            trigger = "overbought"
 
         self._prev_rsi = rsi_val
-        return signal
 
-    def get_state(self) -> dict:
+        return SignalResult(
+            symbol=symbol,
+            direction=direction,
+            strength=strength,
+            confidence=confidence,
+            timestamp=context.timestamp,
+            metadata={"trigger": trigger, "rsi": rsi_val},
+        )
+
+    def get_state(self) -> dict[str, Any]:
         return {"prev_rsi": self._prev_rsi}
 
-    def set_state(self, state: dict) -> None:
+    def set_state(self, state: dict[str, Any]) -> None:
         self._prev_rsi = state.get("prev_rsi")
 
     def reset(self) -> None:
