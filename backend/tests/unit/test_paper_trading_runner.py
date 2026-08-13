@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
+from app.core.config import settings
 from app.domain.enums import OrderSide, Signal
 from app.domain.models import Candle
 from app.engine.runner import PaperTradingRunner
@@ -44,7 +45,7 @@ class TestPaperTradingRunner:
     @pytest.mark.asyncio
     async def test_trading_mode_paper_enforcement(self):
         """Verify runner enforces TRADING_MODE=paper."""
-        with patch("app.engine.runner.settings.trading_mode", "live"):
+        with patch.object(settings, "trading_mode", "live"):
             with pytest.raises(ValueError, match="only supports TRADING_MODE=paper"):
                 PaperTradingRunner()
 

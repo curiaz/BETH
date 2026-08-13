@@ -15,6 +15,19 @@ import structlog
 from app.core.config import settings
 
 
+def redact_sensitive_fields(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    """Structlog processor to sanitize/redact sensitive keys automatically."""
+    for key, val in list(event_dict.items()):
+        key_lower = str(key).lower()
+        if any(s in key_lower for s in ("secret", "password", "api_key", "webhook", "token", "authorization")):
+            val_str = str(val)
+            if "webhooks/" in val_str:
+                event_dict[key] = val_str.split("webhooks/")[0] + "webhooks/****"
+            else:
+                event_dict[key] = "****[REDACTED]****"
+    return event_dict
+
+
 def setup_logging() -> None:
     """Configure structlog and stdlib logging."""
 
@@ -27,6 +40,7 @@ def setup_logging() -> None:
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.UnicodeDecoder(),
+        redact_sensitive_fields,
     ]
 
     if settings.is_development:

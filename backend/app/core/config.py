@@ -101,6 +101,13 @@ class Settings(BaseSettings):
             )
         return v
 
+    def __repr__(self) -> str:
+        return (
+            f"<Settings app_env={self.app_env} trading_mode={self.trading_mode} "
+            f"exchange={self.exchange} binance_api_key='****' binance_api_secret='****' "
+            f"discord_webhook_url='****'>"
+        )
+
 
 # Singleton — import this everywhere
 settings = Settings()

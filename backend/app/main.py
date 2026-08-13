@@ -75,5 +75,13 @@ async def trading_error_handler(request: Request, exc: TradingError) -> JSONResp
 async def bethbot_error_handler(request: Request, exc: BETHBotError) -> JSONResponse:
     return JSONResponse(
         status_code=500,
-        content={"error": "internal_error", "detail": exc.message},
+        content={"error": "internal_error", "detail": "An internal system error occurred. Details have been logged securely."},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={"error": "unhandled_error", "detail": "An unexpected error occurred. Details have been logged securely."},
     )
