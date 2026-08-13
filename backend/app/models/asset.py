@@ -49,8 +49,8 @@ class Asset(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # Relationships
-    candles = relationship("Candle", back_populates="asset", lazy="dynamic")
-    signals = relationship("Signal", back_populates="asset", lazy="dynamic")
+    candles = relationship("CandleModel", back_populates="asset", lazy="select")
+    signals = relationship("Signal", back_populates="asset", lazy="select")
 
     __table_args__ = (
         Index("idx_asset_exchange", "exchange"),
