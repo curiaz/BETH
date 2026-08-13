@@ -19,6 +19,8 @@ from app.domain.enums import (
 from app.domain.models import (
     Account,
     Asset,
+    BacktestResultDomain,
+    BacktestResultModel,
     Candle,
     Market,
     Order,
@@ -50,4 +52,6 @@ __all__ = [
     "Position",
     "Portfolio",
     "Account",
+    "BacktestResultDomain",
+    "BacktestResultModel",
 ]

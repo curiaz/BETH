@@ -546,3 +546,41 @@ class Account(BaseModel):
                 f"Account balance ({self.balance}) does not equal available ({self.available_balance}) + locked ({self.locked_balance})"
             )
         return self
+
+
+# ============================================================================
+# 11. BacktestResult Model
+# ============================================================================
+
+
+class BacktestResultDomain(BaseModel):
+    """
+    Backtest execution result domain model.
+    """
+
+    id: str | int | None = None
+    strategy_name: str
+    symbol: str
+    timeframe: str
+    start_date: datetime
+    end_date: datetime
+
+    initial_capital: Decimal = Field(default=Decimal("10000.0"))
+    final_equity: Decimal = Field(default=Decimal("10000.0"))
+
+    total_return_pct: float = 0.0
+    sharpe_ratio: float | None = None
+    sortino_ratio: float | None = None
+    max_drawdown_pct: float = 0.0
+    win_rate: float = 0.0
+    total_trades: int = 0
+    profit_factor: float | None = None
+    avg_trade_duration_hours: float | None = None
+
+    equity_curve: list[dict[str, Any]] = Field(default_factory=list)
+    trade_log: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# Alias for domain export
+BacktestResultModel = BacktestResultDomain
