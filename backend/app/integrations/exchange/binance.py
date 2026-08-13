@@ -197,6 +197,22 @@ class BinanceMarketDataProvider(MarketDataProvider):
         candles = self._parse_and_validate_klines(raw_klines, norm_symbol, timeframe)
         return candles
 
+    async def get_historical_candles(
+        self,
+        symbol: str,
+        timeframe: str = "1h",
+        limit: int = 100,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> list[Candle]:
+        """
+        Convenience method to retrieve recent historical candles.
+        """
+        if start is None:
+            delta = TIMEFRAME_DELTAS.get(timeframe, timedelta(hours=1)) * limit
+            start = datetime.now(timezone.utc) - delta
+        return await self.fetch_candles(symbol, timeframe, start, end, limit)
+
     async def fetch_ohlcv(
         self,
         symbol: str,
