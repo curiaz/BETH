@@ -10,6 +10,14 @@ from sqlalchemy import DateTime, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
+import uuid
+
+
+def generate_uuid() -> str:
+    """Generate a string UUID4 for primary keys."""
+    return str(uuid.uuid4())
+
+
 class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 

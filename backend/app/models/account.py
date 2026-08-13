@@ -11,7 +11,7 @@ from decimal import Decimal
 from sqlalchemy import Boolean, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, generate_uuid
 
 
 class AccountModel(Base, TimestampMixin):
@@ -19,7 +19,7 @@ class AccountModel(Base, TimestampMixin):
 
     __tablename__ = "accounts"
 
-    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=generate_uuid)
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="Primary Account")
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="USDT")
 
