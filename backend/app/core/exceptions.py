@@ -73,15 +73,24 @@ class MarketDataError(DataError):
 
 
 class InvalidSymbolError(DataError):
-    """Raised when an unsupported trading symbol is requested."""
+    """Raised when a symbol format is malformed or invalid."""
+
+    def __init__(self, symbol: str, reason: str = "Invalid symbol format"):
+        self.symbol = symbol
+        self.reason = reason
+        super().__init__(f"Invalid symbol '{symbol}': {reason}")
+
+
+class UnsupportedSymbolError(InvalidSymbolError):
+    """Raised when a requested symbol is valid in format but not enabled in configuration."""
 
     def __init__(self, symbol: str, supported: list[str] | None = None):
         self.symbol = symbol
         self.supported = supported or []
-        msg = f"Invalid symbol: {symbol}"
+        msg = f"Unsupported symbol '{symbol}'"
         if supported:
-            msg += f". Supported: {', '.join(supported)}"
-        super().__init__(msg)
+            msg += f". Currently supported: {', '.join(supported)}"
+        super().__init__(symbol, reason=msg)
 
 
 # --- Integration Errors ---
