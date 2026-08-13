@@ -22,8 +22,11 @@ class PositionSizeRule(BaseRiskRule):
     name = "position_size"
     priority = 1
 
-    def __init__(self, max_position_pct: float = 0.20):
-        self.max_position_pct = max_position_pct
+    def __init__(self, max_position_pct: float = 0.20, max_position_size_pct: float | None = None):
+        if max_position_size_pct is not None:
+            self.max_position_pct = max_position_size_pct
+        else:
+            self.max_position_pct = max_position_pct
 
     def evaluate(
         self,
@@ -52,8 +55,8 @@ class PositionSizeRule(BaseRiskRule):
                 decision=RiskDecision.REJECTED,
                 rule_name=self.name,
                 reason=(
-                    f"Position would be {pct:.1f}% of equity "
-                    f"(max {self.max_position_pct * 100:.0f}%)"
+                    f"REJECTED: Position size would be {pct:.1f}% of equity "
+                    f"(max allowed: {self.max_position_pct * 100:.0f}%)."
                 ),
             )
 

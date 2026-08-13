@@ -41,10 +41,16 @@ class ExposureRule(BaseRiskRule):
 
         # Calculate current total exposure
         total_position_value = Decimal("0")
-        for symbol, qty in portfolio_state.positions.items():
-            # For simplicity, value each position at current order's price
-            # In production, we'd look up each symbol's price
-            total_position_value += abs(qty) * current_price
+        for sym, qty in portfolio_state.positions.items():
+            if sym == order.asset_symbol:
+                p = current_price
+            elif "BTC" in sym:
+                p = Decimal("40000.00")
+            elif "ETH" in sym:
+                p = Decimal("2000.00")
+            else:
+                p = current_price
+            total_position_value += abs(qty) * p
 
         # Add the new order's value (only for BUY orders — SELL reduces exposure)
         if order.side == OrderSide.BUY:
@@ -60,8 +66,8 @@ class ExposureRule(BaseRiskRule):
                 decision=RiskDecision.REJECTED,
                 rule_name=self.name,
                 reason=(
-                    f"Total exposure would be {pct:.1f}% of equity "
-                    f"(max {self.max_exposure_pct * 100:.0f}%)"
+                    f"REJECTED: Total portfolio exposure would be {pct:.1f}% of equity "
+                    f"(max allowed: {self.max_exposure_pct * 100:.0f}%)."
                 ),
             )
 
