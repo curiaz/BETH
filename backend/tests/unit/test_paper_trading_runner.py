@@ -54,7 +54,8 @@ class TestPaperTradingRunner:
         """Test initialize() and stop() startup and shutdown procedures."""
         runner = PaperTradingRunner(symbols=["BTC/USDT", "ETH/USDT"])
 
-        with patch("app.engine.runner.init_db", new_callable=AsyncMock):
+        with patch("app.engine.runner.init_db", new_callable=AsyncMock), \
+             patch.object(runner, "_recover_state_from_db", new_callable=AsyncMock):
             await runner.initialize()
             assert runner.portfolio_engine.cash_usdt == Decimal("10000.0")
 
