@@ -1,8 +1,8 @@
 """
-BETHBot — Exchange adapter interface.
+BETHBot — Market Data Provider Interface.
 
-All exchange-specific code is isolated behind this abstraction.
-Swapping Binance for Bybit requires only a new adapter implementation.
+Abstract base class for all exchange market data providers.
+All market data consumers depend on this abstraction, not directly on exchange clients.
 """
 
 from __future__ import annotations
@@ -13,19 +13,21 @@ from decimal import Decimal
 
 import pandas as pd
 
+from app.domain.models import Candle, Ticker
 
-class ExchangeAdapter(ABC):
+
+class MarketDataProvider(ABC):
     """
-    Abstract exchange adapter.
+    Abstract market data provider interface.
 
-    Phase 1: Data-only (fetch candles, get ticker price, get exchange info).
-    Phase 2+: Order submission via test/sandbox endpoints first.
+    Isolates exchange REST/WebSocket APIs behind a clean contract.
+    Provides historical OHLCV candlestick data and real-time ticker snapshots.
     """
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """Exchange name (e.g. 'binance')."""
+        """Exchange name (e.g., 'binance')."""
         ...
 
     @abstractmethod
@@ -38,48 +40,53 @@ class ExchangeAdapter(ABC):
         limit: int = 1000,
     ) -> pd.DataFrame:
         """
-        Fetch OHLCV candlestick data.
+        Fetch historical OHLCV candlestick data.
 
         Args:
-            symbol: Trading pair (e.g. "BTC/USDT")
-            timeframe: Candle interval (e.g. "1h", "4h", "1d")
-            start: Start time (inclusive)
-            end: End time (inclusive, optional)
-            limit: Max number of candles to fetch
+            symbol: Trading pair symbol (e.g., "BTC/USDT", "ETH/USDT")
+            timeframe: Candle interval (e.g., "1m", "5m", "15m", "1h", "4h", "1d")
+            start: Start timestamp (inclusive, UTC)
+            end: End timestamp (inclusive, optional, UTC)
+            limit: Maximum candles to return per request
 
         Returns:
-            DataFrame with columns: [open, high, low, close, volume]
-            Index: DatetimeIndex with open_time
+            DataFrame indexed by DatetimeIndex (open_time, UTC) with columns:
+            [open, high, low, close, volume] using Decimal or float types.
         """
         ...
 
     @abstractmethod
-    async def get_ticker_price(self, symbol: str) -> Decimal:
+    async def fetch_candles(
+        self,
+        symbol: str,
+        timeframe: str,
+        start: datetime,
+        end: datetime | None = None,
+        limit: int = 1000,
+    ) -> list[Candle]:
         """
-        Get the current ticker price for a symbol.
-
-        Args:
-            symbol: Trading pair (e.g. "BTC/USDT")
-
-        Returns:
-            Current price as Decimal
+        Fetch historical candles as a list of validated domain Candle objects.
         """
         ...
 
     @abstractmethod
-    async def get_exchange_info(self, symbol: str) -> dict:
+    async def get_ticker(self, symbol: str) -> Ticker:
         """
-        Get exchange-specific info for a symbol (tick size, lot size, etc.).
+        Get the current price ticker snapshot for a symbol.
 
         Args:
-            symbol: Trading pair (e.g. "BTC/USDT")
+            symbol: Trading pair symbol (e.g., "BTC/USDT")
 
         Returns:
-            Dict with keys: tick_size, lot_size, min_notional, etc.
+            Validated Ticker domain model
         """
         ...
 
     @abstractmethod
     async def close(self) -> None:
-        """Close the HTTP client and cleanup resources."""
+        """Close HTTP connections and release resources."""
         ...
+
+
+# Backward compatibility alias
+ExchangeAdapter = MarketDataProvider
