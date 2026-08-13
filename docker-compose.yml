@@ -1,40 +1,57 @@
 services:
-  db:
+  # PostgreSQL Database
+  postgres:
     image: postgres:16-alpine
+    container_name: bethbot-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: bethbot
-      POSTGRES_USER: bethbot
-      POSTGRES_PASSWORD: bethbot_dev
+      POSTGRES_DB: ${POSTGRES_DB:-bethbot}
+      POSTGRES_USER: ${POSTGRES_USER:-bethuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bethpassword}
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bethbot"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bethuser} -d ${POSTGRES_DB:-bethbot}"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
+  # FastAPI Backend API & Quantara Trading Engine
   backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bethbot-backend
+    restart: unless-stopped
     environment:
-      APP_ENV: development
       TRADING_MODE: paper
-      EXCHANGE: binance
+      APP_ENV: development
       PAPER_INITIAL_BALANCE: "10000"
       SUPPORTED_SYMBOLS: "BTC/USDT,ETH/USDT"
-      DATABASE_URL: "postgresql+asyncpg://bethbot:bethbot_dev@db:5432/bethbot"
-      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bethuser}:${POSTGRES_PASSWORD:-bethpassword}@postgres:5432/${POSTGRES_DB:-bethbot}
       CORS_ORIGINS: "http://localhost:3000"
-      DISCORD_WEBHOOK_URL: ""
+    ports:
+      - "8000:8000"
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  # Next.js Frontend UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bethbot-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
-  pgdata:
+  postgres_data:
